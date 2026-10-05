@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raspadita con Canje en Caja y WhatsApp</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .card { background: #1e293b; border-radius: 16px; padding: 20px; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    h2 { font-size: 20px; color: #38bdf8; margin-bottom: 6px; }
+    p { font-size: 13px; color: #94a3b8; margin-bottom: 16px; }
+    
+    .scratch-box { position: relative; width: 280px; height: 150px; margin: 0 auto 16px; border-radius: 12px; overflow: hidden; }
+    .prize-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; color: #0f172a; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; border-radius: 12px; }
+    .prize-title { font-weight: 800; font-size: 18px; color: #2563eb; }
+    .code-badge { background: #f1f5f9; border: 2px dashed #cbd5e1; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-size: 15px; font-weight: bold; color: #0f172a; margin: 6px 0; }
+    .timer { font-size: 12px; font-weight: 600; color: #dc2626; background: #fee2e2; padding: 3px 8px; border-radius: 20px; }
+    canvas { position: absolute; top: 0; left: 0; touch-action: none; cursor: pointer; }
+
+    /* Estado de Canjeado */
+    .redeemed-badge { background: #166534; color: #dcfce7; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 14px; margin-top: 10px; border: 2px solid #22c55e; }
+    
+    /* Botones de Acción */
+    .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-cashier { background: #2563eb; color: white; }
+    .btn-cashier:hover { background: #1d4ed8; }
+    .btn-wa { background: #16a34a; color: white; }
+    .btn-wa:hover { background: #15803d; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>🎁 ¡Premio de Raspadita!</h2>
+    <p>Raspa la tarjeta y muestra esta pantalla al cajero para validar tu descuento.</p>
+
+    <div class="scratch-box">
+      <div class="prize-layer">
+        <div class="prize-title" id="prizeTitle">Cargando...</div>
+        <div class="code-badge" id="valCode">VAL-******</div>
+        <div class="timer" id="timerDisplay">Expira en: --:--</div>
+      </div>
+      <canvas id="scratchCanvas" width="280" height="150"></canvas>
+    </div>
+
+    <!-- Mensaje cuando ya fue canjeado -->
+    <div id="redeemedBox" style="display: none;" class="redeemed-badge">
+      ✅ CUPÓN CANJEADO EN CAJA<br>
+      <span id="redeemedTime" style="font-size: 11px; font-weight: normal; opacity: 0.9;"></span>
+    </div>
+
+    <!-- Botones de Acción -->
+    <div class="actions" id="actionButtons">
+      <button class="btn btn-cashier" onclick="redeemWithPIN()">🔒 Canjear en Caja (PIN Cajero)</button>
+      <button class="btn btn-wa" onclick="sendToWhatsApp()">💬 Registrar por WhatsApp</button>
+    </div>
+  </div>
+
+  <script>
+    // --- CONFIGURACIÓN DEL NEGOCIO ---
+    const CASHIER_PIN = "1234"; // Cambia este PIN por el de tus cajeros
+    const BUSINESS_PHONE = "593999999999"; // Código de país + número de WhatsApp (sin el signo +)
+    const EXPIRATION_MINUTES = 15;
+    const prizes = ["10% de Descuento", "Bebida Personal Gratis", "15% de Descuento"];
+
+    // --- CÓDIGO ÚNICO ---
+    function generateUniqueCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = 'VAL-';
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    }
+
+    // --- ESTADO Y PERSISTENCIA ---
+    let couponData = JSON.parse(localStorage.getItem('scratch_coupon_v2'));
+
+    if (!couponData) {
+      const selectedPrize = prizes[Math.floor(Math.random() * prizes.length)];
+      couponData = {
+        prize: selectedPrize,
+        code: generateUniqueCode(),
+        expiresAt: Date.now() + (EXPIRATION_MINUTES * 60 * 1000),
+        status: 'active',
+        redeemedAt: null,
+        revealed: false
+      };
+      localStorage.setItem('scratch_coupon_v2', JSON.stringify(couponData));
+    }
+
+    // --- RENDERIZAR EN INTERFAZ ---
+    document.getElementById('prizeTitle').innerText = couponData.prize;
+    document.getElementById('valCode').innerText = couponData.code;
+
+    function renderUI() {
+      if (couponData.status === 'redeemed') {
+        document.getElementById('redeemedBox').style.display = 'block';
+        document.getElementById('redeemedTime').innerText = `Canjeado el: ${couponData.redeemedAt}`;
+        document.getElementById('actionButtons').style.display = 'none';
+        document.getElementById('scratchCanvas').style.display = 'none';
+      }
+    }
+    renderUI();
+
+    // --- TEMPORIZADOR ---
+    function updateTimer() {
+      if (couponData.status === 'redeemed') return;
+
+      const remainingMs = couponData.expiresAt - Date.now();
+      if (remainingMs <= 0) {
+        document.getElementById('timerDisplay').innerText = "CUPÓN EXPIRADO";
+        document.getElementById('timerDisplay').style.background = "#555";
+        document.getElementById('timerDisplay').style.color = "#fff";
+        return;
+      }
+
+      const totalSecs = Math.floor(remainingMs / 1000);
+      const mins = String(Math.floor(totalSecs / 60)).padStart(2, '0');
+      const secs = String(totalSecs % 60).padStart(2, '0');
+      document.getElementById('timerDisplay').innerText = `Expira en: ${mins}:${secs}`;
+    }
+    setInterval(updateTimer, 1000);
+    updateTimer();
+
+    // --- ACCIÓN 1: INVALIDAR CON PIN DE CAJERO ---
+    function redeemWithPIN() {
+      const inputPin = prompt("Ingrese el PIN de cajero para validar el descuento:");
+      if (inputPin === CASHIER_PIN) {
+        couponData.status = 'redeemed';
+        couponData.redeemedAt = new Date().toLocaleString();
+        localStorage.setItem('scratch_coupon_v2', JSON.stringify(couponData));
+        renderUI();
+        alert("✅ Cupón canjeado e inhabilitado correctamente.");
+      } else if (inputPin !== null) {
+        alert("❌ PIN incorrecto. Solo el personal de caja puede ingresar la clave.");
+      }
+    }
+
+    // --- ACCIÓN 2: REGISTRO POR WHATSAPP ---
+    function sendToWhatsApp() {
+      const message = `¡Hola! Vengo a canjear mi raspadita:\n\n` +
+                      `🎁 *Premio:* ${couponData.prize}\n` +
+                      `🔑 *Código:* ${couponData.code}\n` +
+                      `⏰ *Generado:* ${new Date().toLocaleTimeString()}`;
+      
+      const url = `https://wa.me/${BUSINESS_PHONE}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+    }
+
+    // --- CANVAS DE RASPADO ---
+    const canvas = document.getElementById('scratchCanvas');
+    const ctx = canvas.getContext('2d');
+
+    if (couponData.revealed || couponData.status === 'redeemed') {
+      canvas.style.display = 'none';
+    } else {
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✨ RASPA AQUÍ ✨', canvas.width / 2, canvas.height / 2 + 5);
+
+      let isDrawing = false;
+      function scratch(e) {
+        if (!isDrawing) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.arc(x, y, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (!couponData.revealed) {
+          couponData.revealed = true;
+          localStorage.setItem('scratch_coupon_v2', JSON.stringify(couponData));
+        }
+      }
+
+      ['mousedown', 'touchstart'].forEach(e => canvas.addEventListener(e, (evt) => { isDrawing = true; scratch(evt); }));
+      ['mousemove', 'touchmove'].forEach(e => canvas.addEventListener(e, scratch));
+      ['mouseup', 'mouseleave', 'touchend'].forEach(e => canvas.addEventListener(e, () => isDrawing = false));
+    }
+  </script>
+</body>
+</html>
