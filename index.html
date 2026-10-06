@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Raspadita con Canje en Caja y WhatsApp</title>
+  <title>Raspadita Promocional</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -60,8 +60,8 @@
 
   <script>
     // --- CONFIGURACIÓN DEL NEGOCIO ---
-    const CASHIER_PIN = "1234"; // Cambia este PIN por el de tus cajeros
-    const BUSINESS_PHONE = "593999999999"; // Código de país + número de WhatsApp (sin el signo +)
+    const CASHIER_PIN = "2350"; // PIN actualizado para el cajero
+    const BUSINESS_PHONE = "593982565003"; // Teléfono configurado para WhatsApp
     const EXPIRATION_MINUTES = 15;
     const prizes = ["10% de Descuento", "Bebida Personal Gratis", "15% de Descuento"];
 
@@ -76,7 +76,7 @@
     }
 
     // --- ESTADO Y PERSISTENCIA ---
-    let couponData = JSON.parse(localStorage.getItem('scratch_coupon_v2'));
+    let couponData = JSON.parse(localStorage.getItem('scratch_coupon_v3'));
 
     if (!couponData) {
       const selectedPrize = prizes[Math.floor(Math.random() * prizes.length)];
@@ -88,7 +88,7 @@
         redeemedAt: null,
         revealed: false
       };
-      localStorage.setItem('scratch_coupon_v2', JSON.stringify(couponData));
+      localStorage.setItem('scratch_coupon_v3', JSON.stringify(couponData));
     }
 
     // --- RENDERIZAR EN INTERFAZ ---
@@ -131,7 +131,7 @@
       if (inputPin === CASHIER_PIN) {
         couponData.status = 'redeemed';
         couponData.redeemedAt = new Date().toLocaleString();
-        localStorage.setItem('scratch_coupon_v2', JSON.stringify(couponData));
+        localStorage.setItem('scratch_coupon_v3', JSON.stringify(couponData));
         renderUI();
         alert("✅ Cupón canjeado e inhabilitado correctamente.");
       } else if (inputPin !== null) {
@@ -178,7 +178,7 @@
 
         if (!couponData.revealed) {
           couponData.revealed = true;
-          localStorage.setItem('scratch_coupon_v2', JSON.stringify(couponData));
+          localStorage.setItem('scratch_coupon_v3', JSON.stringify(couponData));
         }
       }
 
