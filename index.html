@@ -59,9 +59,14 @@
   </div>
 
   <script>
+    // --- RECARGA AUTOMÁTICA CADA 1 MINUTO (60.000 ms) ---
+    setTimeout(() => {
+      window.location.reload();
+    }, 60000);
+
     // --- CONFIGURACIÓN DEL NEGOCIO ---
-    const CASHIER_PIN = "2350"; // PIN actualizado para el cajero
-    const BUSINESS_PHONE = "593982565003"; // Teléfono configurado para WhatsApp
+    const CASHIER_PIN = "2350"; 
+    const BUSINESS_PHONE = "593982565003"; 
     const EXPIRATION_MINUTES = 15;
     const prizes = ["10% de Descuento", "Bebida Personal Gratis", "15% de Descuento"];
 
