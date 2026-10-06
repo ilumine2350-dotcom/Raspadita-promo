@@ -59,15 +59,10 @@
   </div>
 
   <script>
-    // --- RECARGA AUTOMÁTICA CADA 1 MINUTO (60.000 ms) ---
-    setTimeout(() => {
-      window.location.reload();
-    }, 60000);
-
     // --- CONFIGURACIÓN DEL NEGOCIO ---
     const CASHIER_PIN = "2350"; 
     const BUSINESS_PHONE = "593982565003"; 
-    const EXPIRATION_MINUTES = 15;
+    const EXPIRATION_MINUTES = 5; // Expiración a los 5 minutos
     const prizes = ["10% de Descuento", "Bebida Personal Gratis", "15% de Descuento"];
 
     // --- CÓDIGO ÚNICO ---
@@ -80,9 +75,16 @@
       return code;
     }
 
-    // --- ESTADO Y PERSISTENCIA ---
-    let couponData = JSON.parse(localStorage.getItem('scratch_coupon_v3'));
+    // --- ESTADO Y RENOVACIÓN AL EXPIRAR ---
+    let couponData = JSON.parse(localStorage.getItem('scratch_coupon_v4'));
 
+    // Verificar si el cupón guardado ya venció los 5 minutos
+    if (couponData && Date.now() >= couponData.expiresAt) {
+      localStorage.removeItem('scratch_coupon_v4');
+      couponData = null;
+    }
+
+    // Si no hay cupón (o el anterior ya expiró), se genera uno nuevo
     if (!couponData) {
       const selectedPrize = prizes[Math.floor(Math.random() * prizes.length)];
       couponData = {
@@ -93,7 +95,7 @@
         redeemedAt: null,
         revealed: false
       };
-      localStorage.setItem('scratch_coupon_v3', JSON.stringify(couponData));
+      localStorage.setItem('scratch_coupon_v4', JSON.stringify(couponData));
     }
 
     // --- RENDERIZAR EN INTERFAZ ---
@@ -110,15 +112,16 @@
     }
     renderUI();
 
-    // --- TEMPORIZADOR ---
+    // --- TEMPORIZADOR Y REGENERACIÓN ---
     function updateTimer() {
       if (couponData.status === 'redeemed') return;
 
       const remainingMs = couponData.expiresAt - Date.now();
+
+      // Al cumplirse los 5 minutos, remueve el cupón y genera uno nuevo recargando la página
       if (remainingMs <= 0) {
-        document.getElementById('timerDisplay').innerText = "CUPÓN EXPIRADO";
-        document.getElementById('timerDisplay').style.background = "#555";
-        document.getElementById('timerDisplay').style.color = "#fff";
+        localStorage.removeItem('scratch_coupon_v4');
+        window.location.reload();
         return;
       }
 
@@ -136,7 +139,7 @@
       if (inputPin === CASHIER_PIN) {
         couponData.status = 'redeemed';
         couponData.redeemedAt = new Date().toLocaleString();
-        localStorage.setItem('scratch_coupon_v3', JSON.stringify(couponData));
+        localStorage.setItem('scratch_coupon_v4', JSON.stringify(couponData));
         renderUI();
         alert("✅ Cupón canjeado e inhabilitado correctamente.");
       } else if (inputPin !== null) {
@@ -183,7 +186,7 @@
 
         if (!couponData.revealed) {
           couponData.revealed = true;
-          localStorage.setItem('scratch_coupon_v3', JSON.stringify(couponData));
+          localStorage.setItem('scratch_coupon_v4', JSON.stringify(couponData));
         }
       }
 
